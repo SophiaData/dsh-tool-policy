@@ -179,3 +179,69 @@ test('apply 在假 ctx 上注册监听器，且初始化失败不抛错', async 
   };
   assert.doesNotThrow(() => apply(brokenCtx, config));
 });
+
+test('disabled 规则不生效', () => {
+  const disabledPolicy = compilePolicy({
+    rules: [{ tools: ['pwsh'], action: 'deny', disabled: true }],
+  });
+  assert.equal(disabledPolicy.rules.length, 0);
+  assert.equal(disabledPolicy.problems.length, 0);
+});
+
+test('多条规则同时命中时，第一条优先', () => {
+  const ordered = compilePolicy({
+    rules: [
+      { id: 'first', tools: ['pwsh'], action: 'deny' },
+      { id: 'second', tools: ['pwsh'], action: 'ask' },
+    ],
+  });
+  assert.equal(decide(execOf('pwsh', { command: 'x' }), ordered).kind, 'deny');
+});
+
+test('displayReason 只给 zh 时补英文兜底，两个字段都在', () => {
+  const onlyZh = compilePolicy({
+    rules: [{ tools: ['pwsh'], pattern: 'publish', action: 'ask', displayReason: { zh: '需要批准' } }],
+  });
+  const decision = decide(execOf('pwsh', { command: 'publish' }), onlyZh);
+  assert.equal(decision.kind, 'ask');
+  assert.equal(typeof decision.displayReason.en, 'string');
+  assert.ok(decision.displayReason.en.length > 0);
+  assert.equal(decision.displayReason.zh, '需要批准');
+});
+
+test('flags 里的 g / y 被移除并告警，规则仍生效', () => {
+  const stateful = compilePolicy({
+    rules: [{ tools: ['pwsh'], pattern: 'publish', flags: 'gi', action: 'ask' }],
+  });
+  assert.equal(stateful.rules.length, 1);
+  assert.ok(stateful.problems.some((problem) => problem.includes('g/y')));
+  assert.equal(decide(execOf('pwsh', { command: 'publish' }), stateful).kind, 'ask');
+  assert.equal(decide(execOf('pwsh', { command: 'publish' }), stateful).kind, 'ask');
+});
+
+test('rules 非数组、onError 非法都会告警而不是静默全放行', () => {
+  const bad = compilePolicy({ rules: { '0': { tools: ['pwsh'], action: 'ask' } }, onError: 'maybe' });
+  assert.equal(bad.rules.length, 0);
+  assert.equal(bad.problems.length, 2);
+  assert.equal(bad.onError, 'allow');
+});
+
+test('onError: allow 时规则异常放行并记录告警', async () => {
+  const throwing = {
+    rules: [
+      {
+        get toolRes() {
+          throw new Error('boom');
+        },
+        action: 'deny',
+        regex: null,
+      },
+    ],
+    onError: 'allow',
+  };
+  const report = [];
+  const listener = createListener(throwing, (message) => report.push(message));
+  const result = await listener(execOf('pwsh', { command: 'x' }), async () => allow);
+  assert.deepEqual(result, allow);
+  assert.equal(report.length, 1);
+});

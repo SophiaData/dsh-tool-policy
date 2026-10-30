@@ -10,6 +10,9 @@ const TEXT_FIELDS = Object.freeze(['command', 'text', 'code', 'script']);
 
 const REGEXP_SPECIAL = /[.*+?^${}()|[\]\\]/g;
 
+const DEFAULT_EN = (toolName) => `dsh-tool-policy requires your approval for tool "${toolName}".`;
+const DEFAULT_ZH = (toolName) => `dsh-tool-policy：工具 "${toolName}" 需要你批准。`;
+
 /**
  * 把带 `*` 通配的字符串模式编译成整串匹配的正则。
  * 例：`mcp__maxcompute-direct__*` 只匹配该前缀的完整工具名。
@@ -23,7 +26,7 @@ export function patternToRegExp(pattern) {
 }
 
 /**
- * 抽取一次调用里用于正则匹配的文本，只取已知字段，避免把整份 JSON 参数拼进去。
+ * 抽取一次调用里用于正则匹配的命令文本，只取已知字段。
  * @param {unknown} args
  * @returns {string}
  */
@@ -38,28 +41,39 @@ export function collectText(args) {
 }
 
 /**
- * 规则正则的匹配对象：工具名 + 命令文本；参数里没有已知命令字段时退回参数 JSON。
- * 这样 `pattern: 'insert_values'` 既能命中工具名，也能命中脚本内容。
- * @param {{ name: string, arguments?: unknown }} exec
+ * 命令文本为空时的兜底：序列化参数。只在工具名没命中正则时才用到，避免大参数无谓开销。
+ * @param {unknown} args
  * @returns {string}
  */
-export function subjectText(exec) {
-  const command = collectText(exec.arguments);
-  let body = command;
-  if (body.length === 0 && exec.arguments !== undefined) {
-    try {
-      body = JSON.stringify(exec.arguments) ?? '';
-    } catch {
-      body = '';
-    }
+export function fallbackText(args) {
+  if (args === undefined || args === null) return '';
+  try {
+    return JSON.stringify(args) ?? '';
+  } catch {
+    return '';
   }
-  return body.length === 0 ? exec.name : `${exec.name}\n${body}`;
 }
 
+/**
+ * 正则的匹配对象：先匹配工具名，未命中再匹配命令文本（含参数 JSON 兜底）。
+ * @param {{ name: string, arguments?: unknown }} exec
+ * @param {RegExp} regex
+ * @returns {boolean}
+ */
+export function matchesSubject(exec, regex) {
+  if (regex.test(exec.name)) return true;
+  const command = collectText(exec.arguments);
+  return regex.test(command.length > 0 ? command : fallbackText(exec.arguments));
+}
+
+/**
+ * 展示文案必须给 `en`（`dsh-tools` 的 `displayReason` 契约要求），`zh` 可选。
+ * 配置缺 `en` 时用默认英文兜底，保证决策形状合法。
+ */
 function normalizeDisplayReason(raw) {
   if (raw === null || typeof raw !== 'object') return null;
-  const en = typeof raw.en === 'string' ? raw.en : null;
-  const zh = typeof raw.zh === 'string' ? raw.zh : null;
+  const en = typeof raw.en === 'string' && raw.en.length > 0 ? raw.en : null;
+  const zh = typeof raw.zh === 'string' && raw.zh.length > 0 ? raw.zh : null;
   if (en === null && zh === null) return null;
   return {
     ...(en === null ? {} : { en }),
@@ -74,9 +88,18 @@ function normalizeDisplayReason(raw) {
  */
 export function compilePolicy(config = {}) {
   const source = config !== null && typeof config === 'object' ? config : {};
-  const onError = source.onError === 'deny' ? 'deny' : 'allow';
-  const rules = [];
   const problems = [];
+
+  if (source.onError !== undefined && source.onError !== 'allow' && source.onError !== 'deny') {
+    problems.push(`onError 只能是 "allow" 或 "deny"，已按 "allow" 处理`);
+  }
+  const onError = source.onError === 'deny' ? 'deny' : 'allow';
+
+  const rules = [];
+  if (source.rules !== undefined && !Array.isArray(source.rules)) {
+    problems.push('rules 必须是数组；本插件未加载任何规则');
+    return { rules, onError, problems };
+  }
   const rawRules = Array.isArray(source.rules) ? source.rules : [];
 
   rawRules.forEach((raw, index) => {
@@ -107,8 +130,13 @@ export function compilePolicy(config = {}) {
         problems.push(`${where}.pattern 必须是非空字符串`);
         return;
       }
+      const flags = raw.flags === undefined ? 'i' : String(raw.flags);
+      // g / y 会让 RegExp.test 携带 lastIndex，跨调用交替命中；安全规则不允许静默失效。
+      if (/[gy]/.test(flags)) {
+        problems.push(`${where}.flags 含状态标志 g/y，已移除`);
+      }
       try {
-        regex = new RegExp(raw.pattern, raw.flags === undefined ? 'i' : String(raw.flags));
+        regex = new RegExp(raw.pattern, flags.replace(/[gy]/g, ''));
       } catch (error) {
         problems.push(`${where}.pattern 不是合法正则：${error instanceof Error ? error.message : String(error)}`);
         return;
@@ -138,14 +166,14 @@ function denyDecision(rule, toolName) {
 
 function askDecision(rule, toolName) {
   const detail = rule.reason ?? '该命令会触发发布 / 部署 / 回填等生产写操作';
-  const display = rule.displayReason ?? {
-    en: `dsh-tool-policy requires your approval for "${toolName}".`,
-    zh: `dsh-tool-policy：工具 "${toolName}" 需要你批准。`,
-  };
+  const configured = rule.displayReason ?? {};
   return {
     kind: 'ask',
     reason: `dsh-tool-policy requires user approval for tool "${toolName}": ${detail}`,
-    displayReason: display,
+    displayReason: {
+      en: configured.en ?? DEFAULT_EN(toolName),
+      zh: configured.zh ?? DEFAULT_ZH(toolName),
+    },
   };
 }
 
@@ -158,13 +186,9 @@ function askDecision(rule, toolName) {
 export function decide(exec, policy) {
   if (exec === null || typeof exec !== 'object' || typeof exec.name !== 'string') return null;
 
-  let text;
   for (const rule of policy.rules) {
     if (!rule.toolRes.some((re) => re.test(exec.name))) continue;
-    if (rule.regex !== null) {
-      if (text === undefined) text = subjectText(exec);
-      if (!rule.regex.test(text)) continue;
-    }
+    if (rule.regex !== null && !matchesSubject(exec, rule.regex)) continue;
     return rule.action === 'deny' ? denyDecision(rule, exec.name) : askDecision(rule, exec.name);
   }
   return null;

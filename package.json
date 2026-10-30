@@ -15,12 +15,13 @@
     "policy.js",
     "cordis.patch.yml",
     "scripts",
+    "test",
     "README.md"
   ],
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/gtk96/dsh-tool-policy.git"
+    "url": "git+https://github.com/SophiaData/dsh-tool-policy.git"
   },
   "scripts": {
     "test": "node test/policy.test.mjs"

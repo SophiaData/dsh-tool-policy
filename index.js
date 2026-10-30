@@ -47,7 +47,7 @@ export function createListener(policy, report = () => {}) {
 export function apply(ctx, config) {
   try {
     const policy = compilePolicy(config ?? {});
-    for (const problem of policy.problems) warn(ctx, `${name}: 已忽略配置项 ${problem}`);
+    for (const problem of policy.problems) warn(ctx, `${name}: 配置告警：${problem}`);
     const listener = createListener(policy, (message) => warn(ctx, message));
     ctx.effect(function* registerPolicyGate() {
       yield ctx.on('tools/pre-execute', listener);

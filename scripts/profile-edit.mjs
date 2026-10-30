@@ -14,8 +14,20 @@ if (step !== 'dep' && step !== 'bundle') throw new Error('第二参数必须是 
 const file = join(profileDir, 'package.json');
 const text = readFileSync(file, 'utf8');
 
+function dependenciesBlock(source) {
+  const match = /"dependencies"\s*:\s*\{([\s\S]*?)\}/.exec(source);
+  if (match === null) throw new Error('找不到 dependencies 块');
+  return match[1];
+}
+
+function bundlesBlock(source) {
+  const match = /"bundles"\s*:\s*\[([\s\S]*?)\]/.exec(source);
+  if (match === null) throw new Error('找不到 dsh.profile.bundles');
+  return match[1];
+}
+
 if (step === 'dep') {
-  if (text.includes('"dsh-tool-policy"')) {
+  if (/"dsh-tool-policy"\s*:/.test(dependenciesBlock(text))) {
     console.log('dependency 已存在，跳过');
   } else {
     const anchor = '"dsh-mcp-skill-manager": "link:E:/dev-day/dsh-mcp-skill-manager"';
@@ -28,9 +40,10 @@ if (step === 'dep') {
     console.log('已写入 dependency');
   }
 } else {
-  const bundlesBlock = /"bundles"\s*:\s*\[([\s\S]*?)\]/.exec(text);
-  if (bundlesBlock === null) throw new Error('找不到 dsh.profile.bundles');
-  if (/"dsh-tool-policy"/.test(bundlesBlock[1])) {
+  if (!/"dsh-tool-policy"\s*:/.test(dependenciesBlock(text))) {
+    throw new Error('dependencies 里没有 dsh-tool-policy，先执行 dep 步骤');
+  }
+  if (/"dsh-tool-policy"/.test(bundlesBlock(text))) {
     console.log('bundle 已存在，跳过');
   } else {
     const anchor = '        "ds-harness-remote"\n      ]';

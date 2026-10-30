@@ -36,6 +36,8 @@ https://codeload.github.com/gtk96/dsh-tool-policy/tar.gz/refs/heads/main
 
 新会话生效；已存在的会话保留原组合。改完 profile 未生效时重启 DSH。
 
+安装脚本 `scripts/profile-edit.mjs <profileDir> dep|bundle` 做同样两处编辑，幂等、锚点缺失即报错；`bundle` 步骤会先确认 dependency 已存在。
+
 ## 开发
 
 ```sh
@@ -51,20 +53,23 @@ node test/policy.test.mjs
 | 字段 | 含义 |
 |---|---|
 | `rules[].tools` | 工具名或通配模式（`*` 匹配任意字符），必填 |
-| `rules[].pattern` | 可选正则；匹配对象是“工具名 + 命令文本”（`command` / `text` / `code` / `script`），这些字段都没有时退回参数 JSON |
+| `rules[].pattern` | 可选正则。先匹配工具名，工具名未命中再匹配命令文本（`command` / `text` / `code` / `script`）；这些字段都为空时才退回参数 JSON。命令字段非空时**不会**再看其它参数（例如 `ddl_sql`） |
+| `rules[].flags` | 正则标志，默认 `i`；带状态标志 `g` / `y` 会被移除并告警，避免跨调用交替命中 |
 | `rules[].action` | `deny` 或 `ask`，必填 |
 | `rules[].reason` | 给模型的说明（`ask` 时同时作为审批理由） |
-| `rules[].displayReason` | 可选 `{ en, zh }`，审批面板展示文案 |
+| `rules[].displayReason` | 审批面板展示文案；`en` 必须存在（缺省时自动补默认英文），`zh` 可选 |
 | `rules[].disabled` | 置 `true` 临时停用该条 |
 | `onError` | 规则评估抛错时兜底：`allow`（默认）或 `deny` |
 
-非法规则（action 写错、tools 为空、正则编译失败）只记日志并跳过，不会导致插件加载失败。
+非法配置（action 写错、tools 为空、正则编译失败、`rules` 不是数组、`onError` 取值非法）只记配置告警并跳过，不会导致插件加载失败；规则按书写顺序，第一条命中即生效。
 
 ## 局限
 
 - 只拦“工具调用”。PTC 程序或脚本里直接发 HTTP 请求的原始网络调用不经过工具管线，拦不到。
-- `pwsh` / `terminal` 的命令文本靠关键字正则识别，换个不沾关键词的脚本名就漏；这是提示层判断，不是沙箱。
+- `pwsh` / `terminal_send` 的命令文本靠关键字正则识别，换个不沾关键词的脚本名就漏；这是提示层判断，不是沙箱。
+- 浏览器类 MCP（chrome-devtools / playwright）的 `click`、`fill` 无法区分是否在点生产发布按钮，默认不拦。
 - `pattern` 退回参数 JSON 时可能误判（读操作参数里带关键词也会命中）。
+- `data-mcp` 的 `update_cookie` 用 `ask` 而不是 `deny`：Cookie 刷新是你主动运维时才会发生，直接禁掉会阻断自动刷新流程。
 - 规则评估异常默认放行（`onError: allow`），避免规则 bug 阻断日常操作；要严格可改成 `deny`。
 - 审批依赖 DSH 的 approval 服务与应答者；无应答者时 `ask` 会以“无审批通道”拒绝。
 

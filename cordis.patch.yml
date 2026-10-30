@@ -1,0 +1,40 @@
+# dsh-tool-policy 的默认策略，随 bundle 装进 profile。
+#
+# action: deny —— 直接拦下，模型看到“调用未执行，不要重试”；
+# action: ask  —— 走 DSH 审批面板，用户当场批准才执行；会话 approval 策略为 never 时等同拒绝。
+- insert:
+    - id: tool-policy
+      name: dsh-tool-policy
+      config:
+        # 规则自身抛错时的兜底：allow 放行（默认，避免规则 bug 卡死日常操作），deny 拦截。
+        onError: allow
+        rules:
+          - id: data-mcp-write
+            tools:
+              - mcp__data-mcp__execute_ddl
+              - mcp__data-mcp__update_script_file
+              - mcp__data-mcp__update_cookie
+            action: deny
+            reason: 生产 DDL / 节点脚本 / Cookie 写入必须由用户手工执行
+            displayReason:
+              en: This tool writes production state. Run it yourself instead.
+              zh: 该工具会改生产状态，请由你手工执行。
+          - id: odps-write
+            tools:
+              - mcp__maxcompute-direct__*
+              - mcp__maxcompute-mcp__*
+            pattern: insert_values|create_table|update_table
+            action: deny
+            reason: MaxCompute 建表 / 写入 / 改表必须由用户手工执行
+          - id: publish-commands
+            tools:
+              - pwsh
+              - bash
+              - terminal_send
+              - run_code
+            pattern: publish|deploy|updateVertex|updateNode|updateScriptFile|backfill|发布|回填
+            action: ask
+            reason: 发布 / 部署 / 回填属于生产写动作，需要用户当场批准
+            displayReason:
+              en: This command publishes or writes production state. Approve only if you asked for it.
+              zh: 该命令会发布或改动生产状态，只有你确实要求时再批准。

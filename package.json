@@ -1,0 +1,41 @@
+{
+  "name": "dsh-tool-policy",
+  "version": "0.1.0",
+  "description": "DSH profile plugin: deny production write tools and ask before publish/deploy shell commands",
+  "type": "module",
+  "main": "./index.js",
+  "exports": {
+    ".": "./index.js",
+    "./policy.js": "./policy.js",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.js",
+    "policy.js",
+    "cordis.patch.yml",
+    "scripts",
+    "README.md"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gtk96/dsh-tool-policy.git"
+  },
+  "scripts": {
+    "test": "node test/policy.test.mjs"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "peerDependencies": {
+    "@deepseek-ai/dsh": "^0.2.1-rc.3"
+  },
+  "peerDependenciesMeta": {
+    "@deepseek-ai/dsh": {
+      "optional": true
+    }
+  }
+}

@@ -1,6 +1,6 @@
 /**
  * dsh-tool-policy 的单元测试：只测纯决策逻辑与监听器契约，不加载 DSH 运行时。
- * 运行：node --test test/policy.test.mjs
+ * 运行：node test/policy.test.mjs
  */
 
 import test from 'node:test';
@@ -244,4 +244,28 @@ test('onError: allow 时规则异常放行并记录告警', async () => {
   const result = await listener(execOf('pwsh', { command: 'x' }), async () => allow);
   assert.deepEqual(result, allow);
   assert.equal(report.length, 1);
+});
+
+test('多行 SQL 从 sql 字段抽取，换行不影响 \\s+ 匹配', () => {
+  const sqlPolicy = compilePolicy({
+    rules: [{ tools: ['mcp__hologres-direct__*'], pattern: 'insert\\s+into', action: 'ask' }],
+  });
+  assert.equal(decide(execOf('mcp__hologres-direct__execute_sql', { sql: 'INSERT\nINTO t VALUES (1)' }), sqlPolicy).kind, 'ask');
+  assert.equal(decide(execOf('mcp__hologres-direct__execute_sql', { sql: 'SELECT 1' }), sqlPolicy), null);
+});
+
+test('displayReason 的其它语言键保留，en 缺省时补默认英文', () => {
+  const localePolicy = compilePolicy({
+    rules: [{ tools: ['pwsh'], pattern: 'publish', action: 'ask', displayReason: { ja: '承認が必要です' } }],
+  });
+  const decision = decide(execOf('pwsh', { command: 'publish' }), localePolicy);
+  assert.equal(decision.displayReason.ja, '承認が必要です');
+  assert.equal(typeof decision.displayReason.en, 'string');
+  assert.ok(decision.displayReason.en.length > 0);
+});
+
+test('displayReason 形状非法会记 problem', () => {
+  const invalid = compilePolicy({ rules: [{ tools: ['pwsh'], action: 'ask', displayReason: 'oops' }] });
+  assert.equal(invalid.rules.length, 1);
+  assert.ok(invalid.problems.some((problem) => problem.includes('displayReason')));
 });

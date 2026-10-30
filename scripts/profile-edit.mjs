@@ -3,7 +3,7 @@
  * 用法：node scripts/profile-edit.mjs <profileDir> dep|bundle
  */
 
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const profileDir = process.argv[2] ?? process.env.DSH_PROFILE_DIR;
@@ -13,6 +13,13 @@ if (step !== 'dep' && step !== 'bundle') throw new Error('第二参数必须是 
 
 const file = join(profileDir, 'package.json');
 const text = readFileSync(file, 'utf8');
+
+/** 先写临时文件再改名，避免中途失败留下半截 profile。 */
+function writeAtomic(target, content) {
+  const temp = `${target}.tmp-${process.pid}`;
+  writeFileSync(temp, content, 'utf8');
+  renameSync(temp, target);
+}
 
 function dependenciesBlock(source) {
   const match = /"dependencies"\s*:\s*\{([\s\S]*?)\}/.exec(source);
@@ -32,10 +39,9 @@ if (step === 'dep') {
   } else {
     const anchor = '"dsh-mcp-skill-manager": "link:E:/dev-day/dsh-mcp-skill-manager"';
     if (!text.includes(anchor)) throw new Error('找不到 dependency 锚点（dsh-mcp-skill-manager 行）');
-    writeFileSync(
+    writeAtomic(
       file,
       text.replace(anchor, `${anchor},\n    "dsh-tool-policy": "link:E:/dev-day/dsh-tool-policy"`),
-      'utf8',
     );
     console.log('已写入 dependency');
   }
@@ -48,10 +54,9 @@ if (step === 'dep') {
   } else {
     const anchor = '        "ds-harness-remote"\n      ]';
     if (!text.includes(anchor)) throw new Error('找不到 bundles 末尾锚点（ds-harness-remote）');
-    writeFileSync(
+    writeAtomic(
       file,
       text.replace(anchor, '        "ds-harness-remote",\n        "dsh-tool-policy"\n      ]'),
-      'utf8',
     );
     console.log('已写入 bundle');
   }

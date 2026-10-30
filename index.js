@@ -28,11 +28,12 @@ function warn(ctx, message) {
 export function createListener(policy, report = () => {}) {
   return async (exec, next) => {
     let decision;
+    const onError = policy?.onError === 'deny' ? 'deny' : 'allow';
     try {
       decision = decide(exec, policy);
     } catch (error) {
-      report(`${name}: 规则评估失败（onError=${policy.onError}）：${error instanceof Error ? error.message : String(error)}`);
-      if (policy.onError === 'deny') {
+      report(`${name}: 规则评估失败（onError=${onError}）：${error instanceof Error ? error.message : String(error)}`);
+      if (onError === 'deny') {
         return {
           kind: 'deny',
           reason: `${name} 内部错误，已阻止工具 "${exec?.name ?? '?'}" 的调用`,

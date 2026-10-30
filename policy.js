@@ -6,7 +6,7 @@
  */
 
 /** 工具参数里可能承载命令文本的字段；命中任一非空字符串即视为“命令文本”。 */
-const TEXT_FIELDS = Object.freeze(['command', 'text', 'code', 'script']);
+const TEXT_FIELDS = Object.freeze(['command', 'text', 'code', 'script', 'sql', 'ddl_sql', 'query', 'statement']);
 
 const REGEXP_SPECIAL = /[.*+?^${}()|[\]\\]/g;
 
@@ -67,18 +67,16 @@ export function matchesSubject(exec, regex) {
 }
 
 /**
- * 展示文案必须给 `en`（`dsh-tools` 的 `displayReason` 契约要求），`zh` 可选。
+ * 展示文案必须给 `en`（`dsh-tools` 的 `displayReason` 契约要求），其它语言原样保留。
  * 配置缺 `en` 时用默认英文兜底，保证决策形状合法。
  */
 function normalizeDisplayReason(raw) {
   if (raw === null || typeof raw !== 'object') return null;
-  const en = typeof raw.en === 'string' && raw.en.length > 0 ? raw.en : null;
-  const zh = typeof raw.zh === 'string' && raw.zh.length > 0 ? raw.zh : null;
-  if (en === null && zh === null) return null;
-  return {
-    ...(en === null ? {} : { en }),
-    ...(zh === null ? {} : { zh }),
-  };
+  const locales = {};
+  for (const [locale, value] of Object.entries(raw)) {
+    if (typeof value === 'string' && value.length > 0) locales[locale] = value;
+  }
+  return Object.keys(locales).length === 0 ? null : locales;
 }
 
 /**
@@ -143,13 +141,18 @@ export function compilePolicy(config = {}) {
       }
     }
 
+    const displayReason = normalizeDisplayReason(raw.displayReason);
+    if (raw.displayReason !== undefined && displayReason === null) {
+      problems.push(`${where}.displayReason 必须是含字符串语言键的对象`);
+    }
+
     rules.push({
       id: typeof raw.id === 'string' && raw.id.length > 0 ? raw.id : `rule-${index}`,
       action,
       toolRes: toolPatterns.map(patternToRegExp),
       regex,
       reason: typeof raw.reason === 'string' && raw.reason.length > 0 ? raw.reason : null,
-      displayReason: normalizeDisplayReason(raw.displayReason),
+      displayReason,
     });
   });
 
@@ -171,6 +174,7 @@ function askDecision(rule, toolName) {
     kind: 'ask',
     reason: `dsh-tool-policy requires user approval for tool "${toolName}": ${detail}`,
     displayReason: {
+      ...configured,
       en: configured.en ?? DEFAULT_EN(toolName),
       zh: configured.zh ?? DEFAULT_ZH(toolName),
     },

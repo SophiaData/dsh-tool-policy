@@ -145,9 +145,6 @@
                     - mcp__data-mcp__update_script_file
                   action: deny
                   reason: 生产 DDL / 节点脚本写入必须由用户手工执行
-                  displayReason:
-                    en: This tool writes production state. Run it yourself instead.
-                    zh: 该工具会改生产状态，请由你手工执行。
                 # Cookie 刷新是用户侧运维动作，批准一次即可；直接禁掉会阻断自动刷新流程。
                 - id: data-mcp-cookie
                   tools:
@@ -164,12 +161,23 @@
                   pattern: 'insert_values|create_table|update_table'
                   action: deny
                   reason: MaxCompute 建表 / 写入 / 改表必须由用户手工执行
+                # 通用 execute_sql 里的 DDL / DML 关键字同样要问，不只看工具名。
+                - id: odps-sql-write
+                  tools:
+                    - mcp__maxcompute-direct__*
+                    - mcp__maxcompute-mcp__*
+                  pattern: '\b(insert\s+into|update\s+\S+\s+set|delete\s+from|merge\s+into|upsert|create\s+(table|schema|view|index)|drop\s+(table|schema|view|index)|alter\s+table|truncate\s+table|grant\s+|revoke\s+)\b'
+                  action: ask
+                  reason: MaxCompute 写 SQL（DDL / DML）会改动生产数据，需要用户批准
+                  displayReason:
+                    en: This SQL writes to a production MaxCompute table. Approve only if you asked for it.
+                    zh: 这段 SQL 会改生产 MaxCompute 表，只有你确实要求时再批准。
                 # Holo 生产库同理：只读查询照常走，DDL / DML 关键字命中才问。
                 - id: hologres-write-sql
                   tools:
                     - mcp__hologres-direct__*
                     - mcp__hologres-mcp__*
-                  pattern: '\b(insert\s+into|update\s+\S+\s+set|delete\s+from|create\s+(table|schema|view|index)|drop\s+(table|schema|view|index)|alter\s+table|truncate\s+table|grant\s+|revoke\s+)\b'
+                  pattern: '\b(insert\s+into|update\s+\S+\s+set|delete\s+from|merge\s+into|upsert|call\s+|create\s+(table|schema|view|index)|drop\s+(table|schema|view|index)|alter\s+table|truncate\s+table|grant\s+|revoke\s+)\b'
                   action: ask
                   reason: Hologres DDL / DML 会改动生产数据，需要用户批准
                   displayReason:

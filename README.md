@@ -39,6 +39,14 @@ https://codeload.github.com/SophiaData/dsh-tool-policy/tar.gz/refs/heads/main
 
 安装后重启 DSH，在 **设置 → Agent 预设 → 自定义** 里会出现「交付模式」；点「设为默认」即可让新任务默认用它。已存在的会话保留原组合，需要新开会话才切换。
 
+## 适配版本
+
+| DSH 版本 | 状态 |
+|---|---|
+| `0.2.1-rc.3` | 已按安装包内 `dsh-tools` / `dsh-experimental-auto-review` 源码核对（`tools/pre-execute` 签名、决策形状、`ctx.effect/ctx.on`、`displayReason.en`、`dsh-agent-preset` 字段） |
+| `0.2.1-rc.5` | 未核对。`peerDependencies: ^0.2.1-rc.3` 按 semver 接受同 0.2.1 预发布元组（含 rc.5），bundle 不会被 `unmetRequirements` 跳过；但 API 变化未实测 |
+| `0.2.2-alpha.*` | 不满足 peer（不同预发布元组），bundle 会被跳过；需要升 peer 并重核 API 后才能用 |
+
 ## 开发
 
 ```sh
@@ -66,7 +74,7 @@ node test/policy.test.mjs
 | 字段 | 含义 |
 |---|---|
 | `rules[].tools` | 工具名或通配模式（`*` 匹配任意字符），必填 |
-| `rules[].pattern` | 可选正则。先匹配工具名，工具名未命中再匹配命令文本（`command` / `text` / `code` / `script`）；这些字段都为空时才退回参数 JSON。命令字段非空时**不会**再看其它参数（例如 `ddl_sql`） |
+| `rules[].pattern` | 可选正则。先匹配工具名，工具名未命中再匹配命令文本（`command` / `text` / `code` / `script` / `sql` / `ddl_sql` / `query` / `statement`）；这些字段都为空时才退回参数 JSON。命令字段非空时**不会**再看其它参数 |
 | `rules[].flags` | 正则标志，默认 `i`；带状态标志 `g` / `y` 会被移除并告警，避免跨调用交替命中 |
 | `rules[].action` | `deny` 或 `ask`，必填 |
 | `rules[].reason` | 给模型的说明（`ask` 时同时作为审批理由） |

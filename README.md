@@ -1,7 +1,8 @@
 # dsh-tool-policy
 
-DSH profile 插件：在 `tools/pre-execute` 阶段按规则拦截或询问工具调用，让“生产写动作必须由人批准”成为机制而不是提示词约定。
+DSH（DeepSeek Harness）的 Agent 预设 bundle：提供一个 **「交付模式」** 预设，在 `tools/pre-execute` 阶段按规则拦截或询问工具调用，让“生产写动作必须由人批准”成为机制而不是提示词约定。
 
+- 只有切到「交付模式」的会话才挂这个门禁；标准 / PTC / 极简 / 创造模式完全不受影响。
 - `deny`：调用不执行，模型收到“被策略阻止、不要重试”的失败结果。
 - `ask`：走 DSH 审批面板，用户当场批准才执行；会话 approval 策略为 `never` 时等同拒绝。
 - 未命中任何规则的调用行为不变（继续 `next()`）。
@@ -13,7 +14,7 @@ DSH profile 插件：在 `tools/pre-execute` 阶段按规则拦截或询问工�
 在 DSH 的插件管理器里添加 Bundle：
 
 ```text
-https://codeload.github.com/gtk96/dsh-tool-policy/tar.gz/refs/heads/main
+https://codeload.github.com/SophiaData/dsh-tool-policy/tar.gz/refs/heads/main
 ```
 
 ### 方式二：本地 link（开发时）
@@ -34,9 +35,9 @@ https://codeload.github.com/gtk96/dsh-tool-policy/tar.gz/refs/heads/main
    "dsh": { "profile": { "bundles": [ "...", "dsh-tool-policy" ] } }
    ```
 
-新会话生效；已存在的会话保留原组合。改完 profile 未生效时重启 DSH。
-
 安装脚本 `scripts/profile-edit.mjs <profileDir> dep|bundle` 做同样两处编辑，幂等、锚点缺失即报错；`bundle` 步骤会先确认 dependency 已存在。
+
+安装后重启 DSH，在 **设置 → Agent 预设 → 自定义** 里会出现「交付模式」；点「设为默认」即可让新任务默认用它。已存在的会话保留原组合，需要新开会话才切换。
 
 ## 开发
 
@@ -46,9 +47,21 @@ node test/policy.test.mjs
 
 纯 `node:test`，无第三方依赖；`policy.js` 是决策逻辑，`index.js` 只做 Cordis 接线。
 
-## 配置
+## 预设内容
 
-默认策略在 `cordis.patch.yml`，随 bundle 作为 `tool-policy` 条目装进 profile。字段：
+`cordis.patch.yml` 只插入一条 `@deepseek-ai/dsh-agent-preset`（`config.id: delivery`），它的 `plugins` 是标准模式的工具面加上本插件作为最后一项。标准模式的工具面与 `@deepseek-ai/dsh-web-app/presets/standard.patch.yml` 保持一致（22 项，同序），新增第 23 项：
+
+```yaml
+- id: tool-policy
+  name: dsh-tool-policy
+  config: { onError: allow, rules: [...] }
+```
+
+预设是组合层，不会修改其它预设，也不会在 profile 根层注册全局规则。
+
+## 规则配置
+
+规则写在 `cordis.patch.yml` 的 `preset-delivery → plugins[tool-policy] → config`。字段：
 
 | 字段 | 含义 |
 |---|---|
@@ -76,8 +89,8 @@ node test/policy.test.mjs
 ## 验证
 
 - 单元测试：`node test/policy.test.mjs`（纯决策逻辑，不需要 DSH 运行时）。
-- 实机验证：新开会话后让 Agent 执行一条含 `publish` 的 `pwsh` 命令 → 应弹审批；让它调用 `mcp__data-mcp__execute_ddl` → 应被拒绝且模型收到“未执行、不要重试”。
+- 实机验证：新开会话并切到「交付模式」后，让 Agent 执行一条含 `publish` 的 `pwsh` 命令 → 应弹审批；让它调用 `mcp__data-mcp__execute_ddl` → 应被拒绝且模型收到“未执行、不要重试”。
 
 ## 卸载
 
-从 profile 的 `dependencies` 与 `dsh.profile.bundles` 中移除本包，再执行 `pnpm install`；或者保留安装、只把 `cordis.patch.yml` 里 `tool-policy` 行标 `disabled: true`。
+从 profile 的 `dependencies` 与 `dsh.profile.bundles` 中移除本包，再执行 `pnpm install`；或者保留安装、只把 `cordis.patch.yml` 里 `preset-delivery` 行标 `disabled: true`。

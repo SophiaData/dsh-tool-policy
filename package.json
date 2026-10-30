@@ -1,7 +1,7 @@
 {
   "name": "dsh-tool-policy",
   "version": "0.1.0",
-  "description": "DSH profile plugin: deny production write tools and ask before publish/deploy shell commands",
+  "description": "DSH agent preset bundle: 交付模式 with an ask/deny gate for production write tools and publish commands",
   "type": "module",
   "main": "./index.js",
   "exports": {

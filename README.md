@@ -9,13 +9,19 @@ DSH（DeepSeek Harness）的 Agent 预设 bundle：提供一个 **「交付模�
 
 ## 安装
 
-### 方式一：从仓库装（桌面版插件管理器）
+### 方式一：从 npm 装
 
-在 DSH 的插件管理器里添加 Bundle：
-
-```text
-https://codeload.github.com/SophiaData/dsh-tool-policy/tar.gz/refs/heads/main
+```sh
+dsh plugin --profile desktop add @sophiadata-ai/dsh-tool-policy
 ```
+
+然后把包名加入 profile 的 bundle 列表（插件管理器里添加 bundle 亦可）：
+
+```json
+"dsh": { "profile": { "bundles": [ "...", "@sophiadata-ai/dsh-tool-policy" ] } }
+```
+
+没有 npm 账号时，也可用 GitHub Release 里的 tarball 资产代替上面的包名。
 
 ### 方式二：本地 link（开发时）
 
@@ -23,16 +29,16 @@ https://codeload.github.com/SophiaData/dsh-tool-policy/tar.gz/refs/heads/main
 
    ```json
    "dependencies": {
-     "dsh-tool-policy": "link:E:/dev-day/dsh-tool-policy"
+     "@sophiadata-ai/dsh-tool-policy": "link:E:/dev-day/dsh-tool-policy"
    }
    ```
 
-2. 在 profile 目录执行 `pnpm install`，让 `node_modules/dsh-tool-policy` 指向上面的目录。
+2. 在 profile 目录执行 `pnpm install`，让 `node_modules/@sophiadata-ai/dsh-tool-policy` 指向上面的目录。
 
 3. 把包名加进 profile 的 bundle 列表：
 
    ```json
-   "dsh": { "profile": { "bundles": [ "...", "dsh-tool-policy" ] } }
+   "dsh": { "profile": { "bundles": [ "...", "@sophiadata-ai/dsh-tool-policy" ] } }
    ```
 
 安装脚本 `scripts/profile-edit.mjs <profileDir> dep|bundle` 做同样两处编辑，幂等、锚点缺失即报错；`bundle` 步骤会先确认 dependency 已存在。
@@ -97,7 +103,7 @@ node test/policy.test.mjs
 ## 验证
 
 - 单元测试：`node test/policy.test.mjs`（纯决策逻辑，不需要 DSH 运行时）。
-- 实机验证：新开会话并切到「交付模式」后，让 Agent 执行一条含 `publish` 的 `pwsh` 命令 → 应弹审批；让它调用 `mcp__data-mcp__execute_ddl` → 应被拒绝且模型收到“未执行、不要重试”。
+- 实机验证：新开会话并切到「交付模式」后，让 Agent 执行一条含 `publish` 的 `pwsh` 命令 → 应 **deny**（未执行、不要重试）；让它调用 `mcp__data-mcp__execute_ddl` → 同样 **deny**。仅 `update_cookie` 仍为 **ask**（需审批面板或 approval ask）。
 
 ## 卸载
 

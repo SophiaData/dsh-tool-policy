@@ -34,29 +34,29 @@ function bundlesBlock(source) {
 }
 
 if (step === 'dep') {
-  if (/"dsh-tool-policy"\s*:/.test(dependenciesBlock(text))) {
+  if (/"@sophiadata-ai/dsh-tool-policy"\s*:/.test(dependenciesBlock(text))) {
     console.log('dependency 已存在，跳过');
   } else {
-    const anchor = '"dsh-mcp-skill-manager": "link:E:/dev-day/dsh-mcp-skill-manager"';
+    const anchor = '"@sophiadata-ai/dsh-mcp-skill-manager": "link:E:/dev-day/dsh-mcp-skill-manager"';
     if (!text.includes(anchor)) throw new Error('找不到 dependency 锚点（dsh-mcp-skill-manager 行）');
     writeAtomic(
       file,
-      text.replace(anchor, `${anchor},\n    "dsh-tool-policy": "link:E:/dev-day/dsh-tool-policy"`),
+      text.replace(anchor, `${anchor},\n    "@sophiadata-ai/dsh-tool-policy": "link:E:/dev-day/dsh-tool-policy"`),
     );
     console.log('已写入 dependency');
   }
 } else {
-  if (!/"dsh-tool-policy"\s*:/.test(dependenciesBlock(text))) {
+  if (!/"@sophiadata-ai/dsh-tool-policy"\s*:/.test(dependenciesBlock(text))) {
     throw new Error('dependencies 里没有 dsh-tool-policy，先执行 dep 步骤');
   }
-  if (/"dsh-tool-policy"/.test(bundlesBlock(text))) {
+  if (/"@sophiadata-ai/dsh-tool-policy"/.test(bundlesBlock(text))) {
     console.log('bundle 已存在，跳过');
   } else {
     const anchor = '        "ds-harness-remote"\n      ]';
     if (!text.includes(anchor)) throw new Error('找不到 bundles 末尾锚点（ds-harness-remote）');
     writeAtomic(
       file,
-      text.replace(anchor, '        "ds-harness-remote",\n        "dsh-tool-policy"\n      ]'),
+      text.replace(anchor, '        "ds-harness-remote",\n        "@sophiadata-ai/dsh-tool-policy"\n      ]'),
     );
     console.log('已写入 bundle');
   }

@@ -1,5 +1,5 @@
 {
-  "name": "dsh-tool-policy",
+  "name": "@sophiadata-ai/dsh-tool-policy",
   "version": "0.1.0",
   "description": "DSH agent preset bundle: 交付模式 with an ask/deny gate for production write tools and publish commands",
   "type": "module",
@@ -19,6 +19,9 @@
     "README.md"
   ],
   "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/SophiaData/dsh-tool-policy.git"

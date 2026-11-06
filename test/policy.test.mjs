@@ -28,7 +28,8 @@ const config = {
       id: 'publish-commands',
       tools: ['pwsh', 'bash', 'terminal_send', 'run_code'],
       pattern: 'publish|deploy|updateVertex|updateNode|updateScriptFile|backfill|发布|回填',
-      action: 'ask',
+      action: 'deny',
+      reason: '发布 / 部署 / 回填禁止 Agent 代执行',
     },
   ],
 };
@@ -77,16 +78,14 @@ test('通配工具模式 + 参数正则：只拦写工具，不拦读工具', ()
 });
 
 test('参数里没有命令字段时，正则退回匹配参数 JSON', () => {
-  assert.equal(decide(execOf('run_code', { body: 'await publish()' }), policy).kind, 'ask');
+  assert.equal(decide(execOf('run_code', { body: 'await publish()' }), policy).kind, 'deny');
   assert.equal(decide(execOf('run_code', { body: 'console.log(1)' }), policy), null);
 });
 
-test('发布类命令返回 ask 并带中英文 displayReason', () => {
+test('发布类命令返回 deny', () => {
   const decision = decide(execOf('pwsh', { command: 'node scripts/publish-nodes.js' }), policy);
-  assert.equal(decision.kind, 'ask');
-  assert.match(decision.reason, /requires user approval/);
-  assert.equal(typeof decision.displayReason.en, 'string');
-  assert.equal(typeof decision.displayReason.zh, 'string');
+  assert.equal(decision.kind, 'deny');
+  assert.match(decision.reason, /不要重试/);
 });
 
 test('普通命令不触发发布规则', () => {
@@ -94,8 +93,8 @@ test('普通命令不触发发布规则', () => {
 });
 
 test('中文关键词与 run_code 的 code 字段也生效', () => {
-  assert.equal(decide(execOf('pwsh', { command: 'echo 发布节点' }), policy).kind, 'ask');
-  assert.equal(decide(execOf('run_code', { code: 'await tools.mcp__data_mcp__publish({})' }), policy).kind, 'ask');
+  assert.equal(decide(execOf('pwsh', { command: 'echo 发布节点' }), policy).kind, 'deny');
+  assert.equal(decide(execOf('run_code', { code: 'await tools.mcp__data_mcp__publish({})' }), policy).kind, 'deny');
 });
 
 test('patternToRegExp 支持通配且不把正则特殊字符当通配', () => {

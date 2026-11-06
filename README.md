@@ -50,7 +50,8 @@ dsh plugin --profile desktop add @sophiadata-ai/dsh-tool-policy
 | DSH 版本 | 状态 |
 |---|---|
 | `0.2.1-rc.3` | 已按安装包内 `dsh-tools` / `dsh-experimental-auto-review` 源码核对（`tools/pre-execute` 签名、决策形状、`ctx.effect/ctx.on`、`displayReason.en`、`dsh-agent-preset` 字段） |
-| `0.2.1-rc.5` | 未核对。`peerDependencies: ^0.2.1-rc.3` 按 semver 接受同 0.2.1 预发布元组（含 rc.5），bundle 不会被 `unmetRequirements` 跳过；但 API 变化未实测 |
+| `0.2.1-rc.5` | 未核对。`peerDependencies: ^0.2.1-rc.3 || ^0.2.2-rc.1` 按 semver 接受同 0.2.1 预发布元组（含 rc.5），bundle 不会被 `unmetRequirements` 跳过；但 API 变化未实测 |
+| `0.2.2-rc.1` | 已对齐官方 `standard.patch.yml` 工具面（`tool-fs.applyPatch`、delegation 的 `modelSelection`/`modelDiscovery`、`tool-plugin-manager` 条件禁用）；peer 含 `^0.2.2-rc.1` |
 | `0.2.2-alpha.*` | 不满足 peer（不同预发布元组），bundle 会被跳过；需要升 peer 并重核 API 后才能用 |
 
 ## 开发
